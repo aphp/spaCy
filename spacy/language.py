@@ -639,6 +639,8 @@ class Language:
         DOCS: https://spacy.io/api/language#create_pipe
         """
         name = name if name is not None else factory_name
+        # thinc interpolation does not support names with a dot
+        cfg_name = name.replace(".", "-")
         if not isinstance(config, dict):
             err = Errors.E962.format(style="config", name=name, cfg_type=type(config))
             raise ValueError(err)
@@ -668,11 +670,11 @@ class Language:
         config = {"nlp": self, "name": name, **config, "@factories": internal_name}
         # We need to create a top-level key because Thinc doesn't allow resolving
         # top-level references to registered functions. Also gives nicer errors.
-        cfg = {factory_name: config}
+        cfg = {cfg_name: config}
         # We're calling the internal _fill here to avoid constructing the
         # registered functions twice
         resolved = registry.resolve(cfg, validate=validate)
-        filled = registry.fill({"cfg": cfg[factory_name]}, validate=validate)["cfg"]
+        filled = registry.fill({"cfg": cfg[cfg_name]}, validate=validate)["cfg"]
         filled = Config(filled)
         filled["factory"] = factory_name
         filled.pop("@factories", None)
@@ -685,7 +687,7 @@ class Language:
         if raw_config:
             filled = filled.merge(raw_config)
         self._pipe_configs[name] = filled
-        return resolved[factory_name]
+        return resolved[cfg_name]
 
     def create_pipe_from_source(
         self, source_name: str, source: "Language", *, name: str
@@ -771,7 +773,8 @@ class Language:
             bad_val = repr(factory_name)
             err = Errors.E966.format(component=bad_val, name=name)
             raise ValueError(err)
-        name = name if name is not None else factory_name
+        # thinc interpolation does not support names with a dot
+        name = name if name is not None else factory_name.replace(".", "-")
         if name in self.component_names:
             raise ValueError(Errors.E007.format(name=name, opts=self.component_names))
         # Overriding pipe name in the config is not supported and will be ignored.
